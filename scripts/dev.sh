@@ -54,7 +54,17 @@ if [ ! -f "scripts/docker/local-nginx/certs/helperai_dev.crt" ]; then
         # Run chown on native Linux or WSL
         # Set correct ownership
         if [[ "$OS_TYPE" == "Linux" || "$IS_WSL" == true ]]; then
-            chown -R "$USER:$USER" scripts/docker/local-nginx/certs
+            target_dir="scripts/docker/local-nginx/certs"
+
+            # Change ownership only if we have the rights or can elevate.
+            if [ "$(id -u)" -eq 0 ]; then
+                # Running as root – give the files back to the invoking user when possible
+                chown -R "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$target_dir"
+            elif command -v sudo >/dev/null 2>&1; then
+                sudo chown -R "$USER:$USER" "$target_dir" || echo "⚠️  Could not change ownership, continuing…"
+            else
+                echo "Skipping chown: insufficient privileges (not root and no sudo)"
+            fi
         fi
     else
         echo "Skipping chown: 'uname' not available (likely native Windows)"
